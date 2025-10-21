@@ -1,0 +1,1 @@
+cl User32.lib Gdi32.lib Ole32.lib main.cpp
