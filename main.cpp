@@ -115,7 +115,7 @@ HRESULT RecordAudioStream(MyAudioSink* pMySink, string file_name)
     DWORD flags;
     WAVEFORMATEXTENSIBLE* mixFormat;
 
-    int timer = 0;
+    temp = ofstream("temp", ios::binary | ios::app);
 
     hr = CoInitialize(NULL);
     EXIT_ON_ERROR(hr)
@@ -213,7 +213,6 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 
 string parseDate(char *date) {
     string s = date;
-    free(date);
 
     s.pop_back(); // get rid of '\n'
 
@@ -227,8 +226,6 @@ string parseDate(char *date) {
 }
 
 int main() {
-    temp = ofstream("temp", ios::binary | ios::app);
-
     hhook = SetWindowsHookExA(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
 
     MSG msg;
@@ -271,6 +268,7 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
                         auto ct = chrono::system_clock::now();
                         auto t = chrono::system_clock::to_time_t(ct);
 
+                        // NOTE: curr_time is a pointer to static data (so DONT free)
                         char *curr_time = ctime(&t);
                         
                         string file_name = parseDate(curr_time);
