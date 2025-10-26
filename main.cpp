@@ -6,6 +6,7 @@
 #include <winerror.h>
 #include <vector>
 #include <thread>
+#include <string>
 
 using namespace std;
 
@@ -35,8 +36,8 @@ const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
 struct MyAudioSink {
     vector<UINT8> pData;
 
-    HRESULT WriteWavData(WAVEFORMATEX* pwfx) {
-        ofstream out("output.wav", ios::binary);
+    HRESULT WriteWavData(WAVEFORMATEX* pwfx, string file_name) {
+        ofstream out(file_name, ios::binary);
 
         UINT32 file_size = pData.size() + 36;
         UINT32 bloc_size = 16;
@@ -80,7 +81,9 @@ struct MyAudioSink {
             out.write((const char*)block, in.gcount());
 
         in.close();
+        system("del temp");
         
+        // write remaining data (left in the audio buffer)
         out.write((const char*)pData.data(), pData.size());
 
         out.close();
@@ -94,7 +97,7 @@ void DumpAudio(MyAudioSink* pMySink) {
     pMySink->pData.clear();
 }
 
-HRESULT RecordAudioStream(MyAudioSink* pMySink)
+HRESULT RecordAudioStream(MyAudioSink* pMySink, string file_name)
 {
     HRESULT hr;
     REFERENCE_TIME hnsRequestedDuration = REFTIMES_PER_SEC;
@@ -194,7 +197,7 @@ HRESULT RecordAudioStream(MyAudioSink* pMySink)
     hr = pAudioClient->Stop();  // Stop recording.
     EXIT_ON_ERROR(hr)
 
-    pMySink->WriteWavData(pwfx);
+    pMySink->WriteWavData(pwfx, file_name);
 
 Exit:
     CoTaskMemFree(pwfx);
@@ -208,10 +211,22 @@ Exit:
 
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 
-int main() {
-    temp = ofstream("temp", ios::binary);
-    temp.close();
+string parseDate(char *date) {
+    string s = date;
+    free(date);
 
+    s.pop_back(); // get rid of '\n'
+
+    for (int i = 0; i < s.size(); i++)
+        if (s[i] == ':')
+            s[i] = '_';
+
+    s += ".wav";
+
+    return s;
+}
+
+int main() {
     temp = ofstream("temp", ios::binary | ios::app);
 
     hhook = SetWindowsHookExA(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
@@ -227,7 +242,6 @@ int main() {
         t.join();
 
     temp.close();
-    system("del temp");
 
     return 0;
 }
@@ -253,8 +267,16 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
                     
                     if (RECORDING) {
                         printf("Recording started...\n");
+
+                        auto ct = chrono::system_clock::now();
+                        auto t = chrono::system_clock::to_time_t(ct);
+
+                        char *curr_time = ctime(&t);
+                        
+                        string file_name = parseDate(curr_time);
+
                         MyAudioSink* sink = new MyAudioSink;
-                        recorders.push_back(std::thread(RecordAudioStream, sink));
+                        recorders.push_back(std::thread(RecordAudioStream, sink, file_name));
                     } else {
                         printf("Recording stopped\n");
                     }
